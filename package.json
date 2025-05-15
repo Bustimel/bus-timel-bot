@@ -1,13 +1,12 @@
-
 {
   "name": "bus-timel-bot",
   "version": "1.0.0",
-  "description": "Telegram bot for Bus-Timel routes",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.61.0"
+    "telegraf": "^4.12.2"
   }
 }
