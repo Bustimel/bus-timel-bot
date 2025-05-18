@@ -3,3 +3,4 @@ flask
 openai
 requests
 gunicorn
+flask-cors
