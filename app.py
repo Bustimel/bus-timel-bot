@@ -2,13 +2,13 @@ import os
 import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
+from openai import OpenAI
 import requests
 
 app = Flask(__name__)
 CORS(app)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TELEGRAM_USER_ID = os.getenv("TELEGRAM_USER_ID")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -30,11 +30,11 @@ def chat():
         },
         {"role": "user", "content": user_message}
     ]
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # ← зміна тут
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
         messages=messages
     )
-    answer = response.choices[0].message["content"]
+    answer = response.choices[0].message.content
     return jsonify({"reply": answer})
 
 @app.route("/request", methods=["POST"])
@@ -45,7 +45,7 @@ def request_submit():
     route = data.get("route", "")
     date = data.get("date", "")
     text = f"""ЗАЯВКА:
-Ім’я: {name}
+Ім'я: {name}
 Телефон: {phone}
 Маршрут: {route}
 Дата: {date}"""
