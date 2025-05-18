@@ -13,8 +13,8 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 with open("routes.json", "r", encoding="utf-8") as f:
     routes = json.load(f)
 
-def normalize(city):
-    return city.lower().replace("’", "'").replace("ё", "е").replace("і", "и")
+def normalize(text):
+    return text.lower().replace("’", "'").replace("і", "и").strip()
 
 def find_route(from_city, to_city):
     f = normalize(from_city)
@@ -52,11 +52,11 @@ def request_submit():
     phone = data.get("phone", "")
     route = data.get("route", "")
     date = data.get("date", "")
-    text = f"ЗАЯВКА:
+    text = f"""ЗАЯВКА:
 Ім’я: {name}
 Телефон: {phone}
 Маршрут: {route}
-Дата: {date}"
+Дата: {date}"""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": TELEGRAM_USER_ID, "text": text})
     return jsonify({"status": "ok"})
