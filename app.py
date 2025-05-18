@@ -6,7 +6,7 @@ import openai
 import requests
 
 app = Flask(__name__)
-CORS(app)  # Дозволяє запити з інших доменів (наприклад, з сайту)
+CORS(app)
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 TELEGRAM_USER_ID = os.getenv("TELEGRAM_USER_ID")
@@ -14,19 +14,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 with open("routes.json", "r", encoding="utf-8") as f:
     routes = json.load(f)
-
-def normalize(text):
-    return text.lower().replace("’", "'").replace("і", "и").strip()
-
-def find_route(from_city, to_city):
-    f = normalize(from_city)
-    t = normalize(to_city)
-    for route in routes:
-        start = normalize(route["start"])
-        end = normalize(route["end"])
-        if f in start and t in end:
-            return route
-    return None
 
 @app.route("/chat", methods=["POST"])
 def chat():
