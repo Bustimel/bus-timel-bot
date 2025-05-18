@@ -30,7 +30,10 @@ def chat():
         },
         {"role": "user", "content": user_message}
     ]
-    response = openai.ChatCompletion.create(model="gpt-4", messages=messages)
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",  # ← зміна тут
+        messages=messages
+    )
     answer = response.choices[0].message["content"]
     return jsonify({"reply": answer})
 
