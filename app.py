@@ -36,14 +36,20 @@ def chat():
 
     if found_route:
         details = f"Маршрут: {found_route['start']} → {found_route['end']}\n"
-        details += f"Ціна: {found_route['price']} грн\n"
-        details += f"Тривалість: {found_route['duration']}\n"
+        price = found_route.get("price", 0)
+        if price:
+            details += f"Ціна: {price} грн\n"
+        else:
+            details += "Ціна: Уточнюйте за номером +380753750000\n"
+        details += f"Тривалість: {found_route.get('duration', '—')}\n"
         if found_route.get("departure_times"):
             details += f"Відправлення: {', '.join(found_route['departure_times'])}\n"
         if found_route.get("arrival_times"):
             details += f"Прибуття: {', '.join(found_route['arrival_times'])}\n"
-        details += "Зупинки: " + ", ".join([s['city'] for s in found_route["stops"]]) + "\n"
-        details += f"\n[Перейти на сторінку маршруту]({route_link(found_route['start'], found_route['end'])})"
+        if found_route.get("stops"):
+            details += "Зупинки: " + ", ".join([s['city'] for s in found_route["stops"]]) + "\n"
+        link = route_link(found_route['start'], found_route['end'])
+        details += f"\nПереглянути маршрут: {link}"
         reply = details
     else:
         messages = [
@@ -72,11 +78,11 @@ def request_submit():
     phone = data.get("phone", "")
     route = data.get("route", "")
     date = data.get("date", "")
-    text = f"""ЗАЯВКА:
+    text = f'''ЗАЯВКА:
 Ім'я: {name}
 Телефон: {phone}
 Маршрут: {route}
-Дата: {date}"""
+Дата: {date}'''
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": TELEGRAM_USER_ID, "text": text})
     return jsonify({"status": "ok"})
