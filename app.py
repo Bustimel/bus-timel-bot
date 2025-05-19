@@ -36,8 +36,8 @@ def chat():
 
     if found_route:
         details = f"Маршрут: {found_route['start']} → {found_route['end']}\n"
-        price = found_route.get("price", 0)
-        if price:
+        price = str(found_route.get("price", "")).strip().lower()
+        if price and "уточнюйте" not in price and price.replace(" ", "").isdigit():
             details += f"Ціна: {price} грн\n"
         else:
             details += "Ціна: Уточнюйте за номером +380753750000\n"
