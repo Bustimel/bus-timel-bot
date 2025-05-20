@@ -25,14 +25,23 @@ city_aliases = {
     "словянск": "слов’янськ", "славянск": "слов’янськ", "павлограл": "павлоград", "черкасс": "черкаси"
 }
 
+# Слова–намiри, що позначають бажання поїхати або замовити поїздку
+INTENT_KEYWORDS = [
+    "їхати", "доїхати", "купити квиток", "замовити", "забронювати",
+    "потрібен автобус", "потрібен бус", "маршрутка", "маршрутки"
+]
+
 last_session = {}
 
 def normalize(text):
     text = re.sub(r"[’']", "", text.lower()).strip()
     text = re.sub(r"\s+", " ", text)
-    for alias, true_name in city_aliases.items():
-        text = text.replace(alias, true_name)
+    for alias, real in city_aliases.items():
+        text = text.replace(alias, real)
     return text
+
+def contains_intent(msg):
+    return any(kw in msg for kw in INTENT_KEYWORDS)
 
 def fuzzy_city(word):
     word = normalize(word)
@@ -59,10 +68,10 @@ def find_route_by_stops(start, end):
     return None, []
 
 def extract_price(route, end):
-    if normalize(route["end"]) == end:
-        return route.get("price")
+    if normalize(route["end"]) == end and route.get("price"):
+        return route["price"]
     for stop in route.get("stops", []):
-        if normalize(stop["city"]) == end and stop.get("price", "").replace(" ", "").isdigit():
+        if normalize(stop["city"]) == end and stop.get("price") and stop["price"].replace(" ", "").isdigit():
             return stop["price"]
     return None
 
@@ -76,22 +85,29 @@ def chat():
     if session_id not in last_session:
         last_session[session_id] = {"greeted": False}
 
+    # Привітання при першому зверненні
     if not last_session[session_id]["greeted"]:
         last_session[session_id]["greeted"] = True
-        return jsonify({"reply": "Вітаю! Я диспетчер Bus-Timel. Напишіть, будь ласка, з якого міста і куди ви хочете їхати."})
+        return jsonify({"reply": "Вітаю! Я диспетчер Bus-Timel. Куди хочете їхати та звідки?"})
 
-    # Перевірка "наоборот"
+    # Якщо повідомлення не містить наміру їхати — перенаправимо
+    if not contains_intent(msg) and len(extract_two_cities(msg)) < 2:
+        return jsonify({"reply": "Я лише диспетчер автобусних маршрутів. Напишіть, будь ласка, куди ви плануєте їхати та звідки."})
+
+    # Обробка “наоборот”
     if any(w in msg for w in ["в обратном направлении", "наоборот", "ні", "нет"]):
         if "confirm" in last_session[session_id]:
             start, end = last_session[session_id]["confirm"]
             start, end = end, start
         else:
-            return jsonify({"reply": "Окей, тоді уточніть напрямок ще раз."})
+            return jsonify({"reply": "Окей, уточніть, будь ласка, напрямок ще раз — звідки і куди."})
 
+    # Підтвердження
     elif msg in ["так", "да"] and "confirm" in last_session[session_id]:
         start, end = last_session[session_id]["confirm"]
 
     else:
+        # Витягуємо до двох міст
         cities = extract_two_cities(msg)
         if len(cities) == 2:
             start, end = cities[0], cities[1]
@@ -100,10 +116,15 @@ def chat():
                 "reply": f"Ви маєте на увазі з {start.capitalize()} до {end.capitalize()}?",
                 "confirm": {"start": start, "end": end}
             })
+        # Якщо вказано лише призначення
+        elif len(cities) == 1:
+            city = cities[0]
+            # Визначимо, чи воно ймовірно призначення
+            return jsonify({"reply": f"З якого міста ви хочете їхати до {city.capitalize()}?"})
         else:
-            return jsonify({"reply": "Напишіть, будь ласка, з якого міста і куди ви хочете їхати."})
+            return jsonify({"reply": "Напишіть, будь ласка, куди ви хочете поїхати і звідки — можливо, з уточненням 'з' або 'до'."})
 
-    # Знаходимо маршрут
+    # Шукаємо маршрут по зупинках
     route, all_points = find_route_by_stops(start, end)
     if route:
         idx_start = all_points.index(start)
@@ -123,11 +144,11 @@ def chat():
         reply += f"🔗 <a href='{link}'>Переглянути маршрут</a>\n📝 <a href='{link}'>Забронювати місце</a>"
         return jsonify({"reply": reply, "html": True})
 
-    return jsonify({"reply": "Маршрут не знайдено. Напишіть, будь ласка, напрямок ще раз."})
+    return jsonify({"reply": "На жаль, маршрут не знайдено. Спробуйте іншу комбінацію міст."})
 
 @app.route("/")
 def index():
-    return "Bus-Timel Fuzzy Smart Bot"
+    return "Bus-Timel Smart Dispatcher is running."
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
