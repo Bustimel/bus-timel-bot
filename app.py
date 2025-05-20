@@ -6,7 +6,6 @@ from flask_cors import CORS
 from openai import OpenAI
 import requests
 from thefuzz import fuzz
-from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -84,16 +83,12 @@ def chat():
     user_message = data.get("message", "")
     session_id = data.get("session_id", "default")
 
-    # Нічний режим
-    now_hour = datetime.now().hour
-    if now_hour >= 21 or now_hour < 7:
-        return jsonify({"reply": "Диспетчер зараз відпочиває. Ми з вами зв’яжемося зранку!"})
-
     # FAQ відповіді
     for keyword, answer in faq_keywords.items():
         if keyword in user_message.lower():
             return jsonify({"reply": answer})
 
+    # Контекстна сесія
     if '→' not in user_message and session_id in user_sessions:
         from_city = user_sessions[session_id]
         to_city = user_message.strip()
@@ -110,6 +105,7 @@ def chat():
         user_sessions[session_id] = city
         return jsonify({"reply": f"Куди саме ви хочете їхати з {city}?"})
 
+    # Пошук по зупинках
     route_between = find_route_between_stops(user_message)
     if route_between:
         route, from_city, to_city, i, j = route_between
@@ -125,6 +121,7 @@ def chat():
         requests.post(url, json={"chat_id": TELEGRAM_USER_ID, "text": text})
         return jsonify({"reply": reply})
 
+    # Пошук основного маршруту
     found_route = find_best_route(user_message)
     if found_route:
         details = f"Маршрут: {found_route['start']} → {found_route['end']}\n"
