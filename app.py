@@ -1,9 +1,9 @@
-
 import os
 import json
 import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from thefuzz import process
 
 app = Flask(__name__)
 CORS(app)
@@ -11,80 +11,18 @@ CORS(app)
 with open("routes.json", "r", encoding="utf-8") as f:
     routes = json.load(f)
 
-ALL_CITIES = [
-  "бабанка",
-  "баштанка",
-  "бориспіль",
-  "велика виска",
-  "вороновиця",
-  "вінниця",
-  "гайсин",
-  "гришине",
-  "дніпро",
-  "добропілля",
-  "дружківка",
-  "житомир",
-  "запоріжжя",
-  "знам'янка",
-  "золотоноша",
-  "казанка",
-  "кам'янка",
-  "канів",
-  "карлівка",
-  "київ",
-  "коблево",
-  "краматорськ",
-  "красноград",
-  "краснопілка",
-  "кривий ріг",
-  "кропивницький",
-  "лубни",
-  "львів",
-  "межова",
-  "миколаїв",
-  "миколаївка",
-  "немирів",
-  "новий буг",
-  "новоархангельск",
-  "новомосковськ (самар)",
-  "одеса",
-  "олександрівка",
-  "олександрія",
-  "орадівка",
-  "п'ятихатки",
-  "павлоград",
-  "пирятин",
-  "покровськ",
-  "полтава",
-  "райгород",
-  "решитилівка",
-  "рівне",
-  "слов'янка",
-  "слов'янськ",
-  "слов’янськ",
-  "смоліне",
-  "сміла",
-  "суми",
-  "тернопіль",
-  "умань",
-  "харків",
-  "хмельницький",
-  "хмельове",
-  "хорол",
-  "черкаси",
-  "ізюм"
-]
+# Унікальні міста
+ALL_CITIES = sorted(set(
+    city.lower()
+    for route in routes
+    for city in [route["start"], route["end"]] + [s["city"] for s in route.get("stops", [])]
+))
 
+# Синоніми і російські назви
 city_aliases = {
-    "днепр": "дніпро",
-    "умань": "умань",
-    "львов": "львів",
-    "винница": "вінниця",
-    "кропивницкий": "кропивницький",
-    "доброполье": "добропілля",
-    "краматорск": "краматорськ",
-    "словянск": "слов’янськ",
-    "павлоград": "павлоград"
+    "днепр": "дніпро", "умань": "умань", "львов": "львів", "винница": "вінниця",
+    "кропивницкий": "кропивницький", "доброполье": "добропілля", "краматорск": "краматорськ",
+    "словянск": "слов’янськ", "славянск": "слов’янськ", "павлограл": "павлоград", "черкасс": "черкаси"
 }
 
 last_session = {}
@@ -96,8 +34,19 @@ def normalize(text):
         text = text.replace(alias, true_name)
     return text
 
-def extract_cities(msg):
-    return [c for c in ALL_CITIES if c in normalize(msg)]
+def fuzzy_city(word):
+    word = normalize(word)
+    result = process.extractOne(word, ALL_CITIES)
+    return result[0] if result and result[1] >= 70 else None
+
+def extract_two_cities(text):
+    words = normalize(text).split()
+    found = []
+    for word in words:
+        city = fuzzy_city(word)
+        if city and city not in found:
+            found.append(city)
+    return found[:2]
 
 def route_link(start, end):
     return f"https://bus-timel.com.ua/routes/{normalize(start).replace(' ', '-')}-{normalize(end).replace(' ', '-')}.html"
@@ -113,7 +62,7 @@ def extract_price(route, end):
     if normalize(route["end"]) == end:
         return route.get("price")
     for stop in route.get("stops", []):
-        if normalize(stop["city"]) == end and stop.get("price") and stop["price"].replace(" ", "").isdigit():
+        if normalize(stop["city"]) == end and stop.get("price", "").replace(" ", "").isdigit():
             return stop["price"]
     return None
 
@@ -131,12 +80,19 @@ def chat():
         last_session[session_id]["greeted"] = True
         return jsonify({"reply": "Вітаю! Я диспетчер Bus-Timel. Напишіть, будь ласка, з якого міста і куди ви хочете їхати."})
 
-    if msg in ["так", "да"] and "confirm" in last_session[session_id]:
+    # Перевірка "наоборот"
+    if any(w in msg for w in ["в обратном направлении", "наоборот", "ні", "нет"]):
+        if "confirm" in last_session[session_id]:
+            start, end = last_session[session_id]["confirm"]
+            start, end = end, start
+        else:
+            return jsonify({"reply": "Окей, тоді уточніть напрямок ще раз."})
+
+    elif msg in ["так", "да"] and "confirm" in last_session[session_id]:
         start, end = last_session[session_id]["confirm"]
-    elif msg in ["ні", "нет", "наоборот"] and "confirm" in last_session[session_id]:
-        end, start = last_session[session_id]["confirm"]
+
     else:
-        cities = extract_cities(msg)
+        cities = extract_two_cities(msg)
         if len(cities) == 2:
             start, end = cities[0], cities[1]
             last_session[session_id]["confirm"] = (start, end)
@@ -147,6 +103,7 @@ def chat():
         else:
             return jsonify({"reply": "Напишіть, будь ласка, з якого міста і куди ви хочете їхати."})
 
+    # Знаходимо маршрут
     route, all_points = find_route_by_stops(start, end)
     if route:
         idx_start = all_points.index(start)
@@ -166,11 +123,11 @@ def chat():
         reply += f"🔗 <a href='{link}'>Переглянути маршрут</a>\n📝 <a href='{link}'>Забронювати місце</a>"
         return jsonify({"reply": reply, "html": True})
 
-    return jsonify({"reply": "На жаль, маршрут з цих міст не знайдено. Уточніть, будь ласка, ще раз."})
+    return jsonify({"reply": "Маршрут не знайдено. Напишіть, будь ласка, напрямок ще раз."})
 
 @app.route("/")
 def index():
-    return "Bus-Timel MEGA BOT is running."
+    return "Bus-Timel Fuzzy Smart Bot"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
