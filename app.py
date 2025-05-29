@@ -90,12 +90,18 @@ def chat():
     session_id = data.get("session_id", "default")
     logging.info(f"[{session_id}] {msg}")
     context = sessions.get(session_id, {"greeted": False, "confirm": None, "booking": None})
+    msg_norm = normalize(msg)
+
+    # 🧠 Small talk до витягу міст
+    if any(kw in msg_norm for kw in ["як справи", "как дела", "що ти", "ти хто", "бот", "диспетчер"]):
+        return jsonify({"reply": gpt_reply(msg)})
 
     if not context["greeted"]:
         context["greeted"] = True
         sessions[session_id] = context
         return jsonify({"reply": "Привіт! Я диспетчер Bus-Timel. Напишіть, звідки і куди хочете їхати 🚌"})
 
+    # Підтвердження
     if msg.lower() in ["так", "да"] and context.get("confirm"):
         start = context["confirm"]["start"]
         end = context["confirm"]["end"]
@@ -115,12 +121,14 @@ def chat():
             sessions[session_id] = context
             return jsonify({"reply": reply})
 
+    # Зворотній напрямок
     if msg.lower() in ["ні", "нет", "наоборот", "в обратном напрямку"] and context.get("confirm"):
         s, e = context["confirm"]["start"], context["confirm"]["end"]
         context["confirm"] = {"start": e, "end": s}
         sessions[session_id] = context
         return jsonify({"reply": f"Тоді, можливо, з {e.capitalize()} до {s.capitalize()}?", "confirm": context["confirm"]})
 
+    # Ім’я + телефон
     if context.get("booking") and context["booking"].get("pending"):
         match = re.match(r"(.+?)\s*(\+?\d{10,12})$", msg)
         if match:
@@ -132,9 +140,19 @@ def chat():
         else:
             return jsonify({"reply": "Будь ласка, надішліть ім’я та номер у форматі: Олег +380123456789"})
 
-    cities = extract_cities(msg)
-    msg_norm = normalize(msg)
+    # 🧹 Витяг міст з фільтрацією
+    def extract_cities_filtered(text):
+        words = normalize(text).split()
+        found = []
+        for word in words:
+            city = match_city(word)
+            if city and "-" not in city and city not in found:
+                found.append(city)
+        return found[:2]
 
+    cities = extract_cities_filtered(msg)
+
+    # Питання про час, прибуття, ціну
     if any(word in msg_norm for word in ["во сколько", "время", "відправлення", "коли", "выезд", "отправка"]):
         if len(cities) == 1:
             return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
@@ -159,19 +177,18 @@ def chat():
             if route:
                 return jsonify({"reply": f"💰 Вартість проїзду з {cities[0].capitalize()} до {cities[1].capitalize()}: {route.get('price', 'уточнюйте')} грн"})
 
+    # Якщо 2 міста → підтвердження
     if len(cities) == 2:
         context["confirm"] = {"start": cities[0], "end": cities[1]}
         sessions[session_id] = context
         return jsonify({"reply": f"Ви маєте на увазі з {cities[0].capitalize()} до {cities[1].capitalize()}?", "confirm": context["confirm"]})
 
+    # Якщо 1 місто → уточнення
     if len(cities) == 1:
         if re.search(r"\b(до|в|на|у)\b", msg):
             return jsonify({"reply": f"З якого міста ви хочете їхати до {cities[0].capitalize()}?"})
         else:
             return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
-
-    if any(word in msg_norm for word in ["що ти", "бот", "диспетчер", "є місця", "оплата", "посадка"]):
-        return jsonify({"reply": gpt_reply(msg)})
 
     sessions[session_id] = context
     return jsonify({"reply": "Напишіть, будь ласка, звідки і куди хочете їхати. Я підкажу маршрут, ціну та час 🚌"})
