@@ -197,18 +197,18 @@ def chat():
         sessions[session_id] = context
         return jsonify({"reply": f"Ви маєте на увазі з {cities[0].capitalize()} до {cities[1].capitalize()}?", "confirm": context["confirm"]})
 
-    # Якщо 1 місто → уточнення
+        # Якщо 1 місто → уточнення
     if len(cities) == 1:
         if re.search(r"\b(до|в|на|у)\b", msg):
             return jsonify({"reply": f"З якого міста ви хочете їхати до {cities[0].capitalize()}?"})
         else:
             return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
 
-    sessions[session_id] = context
+    if not cities and not context.get("confirm") and not context.get("booking"):
+        return jsonify({"reply": gpt_reply(msg)})
 
+    sessions[session_id] = context
     return jsonify({"reply": "Напишіть, будь ласка, звідки і куди хочете їхати. Я підкажу маршрут, ціну та час 🚌"})
-if not cities and not context.get("confirm") and not context.get("booking"):
-    return jsonify({"reply": gpt_reply(msg)})
 
 @app.route("/")
 def index():
