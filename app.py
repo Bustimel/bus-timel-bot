@@ -89,7 +89,7 @@ def chat():
     msg = data.get("message", "").strip()
     session_id = data.get("session_id", "default")
     logging.info(f"[{session_id}] {msg}")
-    context = sessions.get(session_id, {"greeted": False, "confirm": None, "booking": None})
+    context = sessions.get(session_id, {"greeted": False, "confirm": None, "booking": None, "partial_city": None})
     msg_norm = normalize(msg)
 
     # 🧠 Small talk до витягу міст
@@ -136,6 +136,7 @@ def chat():
     if msg.lower() in ["ні", "нет", "наоборот", "в обратном напрямку"] and context.get("confirm"):
         s, e = context["confirm"]["start"], context["confirm"]["end"]
         context["confirm"] = {"start": e, "end": s}
+        context["partial_city"] = None
         sessions[session_id] = context
         return jsonify({"reply": f"Тоді, можливо, з {e.capitalize()} до {s.capitalize()}?", "confirm": context["confirm"]})
 
@@ -197,12 +198,19 @@ def chat():
         sessions[session_id] = context
         return jsonify({"reply": f"Ви маєте на увазі з {cities[0].capitalize()} до {cities[1].capitalize()}?", "confirm": context["confirm"]})
 
-        # Якщо 1 місто → уточнення
+        # Якщо 1 місто — збереження або формування напрямку
     if len(cities) == 1:
-        if re.search(r"\b(до|в|на|у)\b", msg):
-            return jsonify({"reply": f"З якого міста ви хочете їхати до {cities[0].capitalize()}?"})
-        else:
-            return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
+        if context.get("partial_city"):
+            start = context["partial_city"]
+            end = cities[0]
+            context["confirm"] = {"start": start, "end": end}
+            context["partial_city"] = None
+            sessions[session_id] = context
+            return jsonify({"reply": f"Ви маєте на увазі з {start.capitalize()} до {end.capitalize()}?", "confirm": context["confirm"]})
+    else:
+        context["partial_city"] = cities[0]
+        sessions[session_id] = context
+        return jsonify({"reply": f"З яким містом поєднати {cities[0].capitalize()}? Напишіть ще одне місто."})
 
     if not cities and not context.get("confirm") and not context.get("booking"):
         return jsonify({"reply": gpt_reply(msg)})
