@@ -95,6 +95,17 @@ def chat():
     # 🧠 Small talk до витягу міст
     if any(kw in msg_norm for kw in ["як справи", "как дела", "що ти", "ти хто", "бот", "диспетчер"]):
         return jsonify({"reply": gpt_reply(msg)})
+        if any(kw in msg_norm for kw in ["маршрути з", "рейси з", "маршруты из", "рейсы из"]):
+    city = next((match_city(w) for w in msg_norm.split() if match_city(w)), None)
+    if city:
+        results = [r for r in routes if r["start"].lower() == city]
+        if results:
+            reply = f"📍 Доступні маршрути з {city.capitalize()}:\n"
+            for r in results[:5]:
+                reply += f"– {r['end'].capitalize()} ({r.get('price', 'ціна?')} грн)\n"
+            return jsonify({"reply": reply})
+        else:
+            return jsonify({"reply": f"Маршрутів з {city.capitalize()} не знайдено 🙁"})
 
     if not context["greeted"]:
         context["greeted"] = True
@@ -107,7 +118,7 @@ def chat():
         end = context["confirm"]["end"]
         route = find_real_route(start, end)
         if route:
-            link = f"https://bus-timel.com.ua/routes/{route['url_slug']}.html"
+            link = f"https://bus-timel.com.ua/routes/{route['url_slug']}.html" if "url_slug" in route else "https://bus-timel.com.ua/routes"
             reply = f"🚌 Маршрут: {start.capitalize()} → {end.capitalize()}\n"
             reply += f"💰 Ціна: {route.get('price', 'уточнюйте')} грн\n"
             if route.get("departure_times"):
@@ -135,6 +146,7 @@ def chat():
             name, phone = match.groups()
             b = context["booking"]
             send_email(name, phone, b["start"], b["end"])
+            context["booking"]["pending"] = False
             sessions[session_id] = {"greeted": True}
             return jsonify({"reply": f"✅ Дякуємо, {name}! Заявка прийнята. Очікуйте дзвінок ☎️"})
         else:
@@ -157,6 +169,8 @@ def chat():
         if len(cities) == 1:
             return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
         elif len(cities) == 2:
+            if cities[0] == cities[1]:
+    return jsonify({"reply": "Вкажіть різні міста відправлення та прибуття 🙏"})
             route = find_real_route(cities[0], cities[1])
             if route and route.get("departure_times"):
                 return jsonify({"reply": f"⏰ Відправлення з {cities[0].capitalize()} до {cities[1].capitalize()} о {route['departure_times'][0]}"})
@@ -192,6 +206,9 @@ def chat():
 
     sessions[session_id] = context
     return jsonify({"reply": "Напишіть, будь ласка, звідки і куди хочете їхати. Я підкажу маршрут, ціну та час 🚌"})
+if not cities and not context.get("confirm") and not context.get("booking"):
+    return jsonify({"reply": gpt_reply(msg)})
+
 
 @app.route("/")
 def index():
