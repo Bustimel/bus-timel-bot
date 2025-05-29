@@ -12,7 +12,11 @@ import openai
 from city_forms import CITY_FORMS
 
 app = Flask(__name__)
-CORS(app, resources={r"/chat": {"origins": "https://bus-timel.com.ua"}})
+CORS(app, resources={r"/chat": {"origins": [
+    "https://bus-timel.com.ua",
+    "http://localhost:8080"
+]}})
+
 logging.basicConfig(filename='bot.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 sessions = {}
 
