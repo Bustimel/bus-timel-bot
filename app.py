@@ -95,17 +95,17 @@ def chat():
     # 🧠 Small talk до витягу міст
     if any(kw in msg_norm for kw in ["як справи", "как дела", "що ти", "ти хто", "бот", "диспетчер"]):
         return jsonify({"reply": gpt_reply(msg)})
-        if any(kw in msg_norm for kw in ["маршрути з", "рейси з", "маршруты из", "рейсы из"]):
-    city = next((match_city(w) for w in msg_norm.split() if match_city(w)), None)
-    if city:
-        results = [r for r in routes if r["start"].lower() == city]
-        if results:
-            reply = f"📍 Доступні маршрути з {city.capitalize()}:\n"
-            for r in results[:5]:
-                reply += f"– {r['end'].capitalize()} ({r.get('price', 'ціна?')} грн)\n"
-            return jsonify({"reply": reply})
-        else:
-            return jsonify({"reply": f"Маршрутів з {city.capitalize()} не знайдено 🙁"})
+            if any(kw in msg_norm for kw in ["маршрути з", "рейси з", "маршруты из", "рейсы из"]):
+        city = next((match_city(w) for w in msg_norm.split() if match_city(w)), None)
+        if city:
+            results = [r for r in routes if r["start"].lower() == city]
+            if results:
+                reply = f"📍 Доступні маршрути з {city.capitalize()}:\n"
+                for r in results[:5]:
+                    reply += f"– {r['end'].capitalize()} ({r.get('price', 'ціна?')} грн)\n"
+                return jsonify({"reply": reply})
+            else:
+                return jsonify({"reply": f"Маршрутів з {city.capitalize()} не знайдено 🙁"})
 
     if not context["greeted"]:
         context["greeted"] = True
