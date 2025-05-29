@@ -205,10 +205,10 @@ def chat():
             return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
 
     sessions[session_id] = context
+
     return jsonify({"reply": "Напишіть, будь ласка, звідки і куди хочете їхати. Я підкажу маршрут, ціну та час 🚌"})
 if not cities and not context.get("confirm") and not context.get("booking"):
     return jsonify({"reply": gpt_reply(msg)})
-
 
 @app.route("/")
 def index():
