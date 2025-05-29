@@ -170,7 +170,7 @@ def chat():
             return jsonify({"reply": f"У яке місто ви хочете їхати з {cities[0].capitalize()}?"})
         elif len(cities) == 2:
             if cities[0] == cities[1]:
-    return jsonify({"reply": "Вкажіть різні міста відправлення та прибуття 🙏"})
+                return jsonify({"reply": "Вкажіть різні міста відправлення та прибуття 🙏"})
             route = find_real_route(cities[0], cities[1])
             if route and route.get("departure_times"):
                 return jsonify({"reply": f"⏰ Відправлення з {cities[0].capitalize()} до {cities[1].capitalize()} о {route['departure_times'][0]}"})
